@@ -1,13 +1,19 @@
 package com.atguigu.gmall.product.service.impl;
 
 import com.atguigu.gmall.base.model.BaseEntity;
+import com.atguigu.gmall.common.cache.GmallCache;
+import com.atguigu.gmall.common.constant.RedisConst;
 import com.atguigu.gmall.product.mapper.*;
 import com.atguigu.gmall.product.model.*;
 import com.atguigu.gmall.product.service.SkuManageService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import org.redisson.api.RBloomFilter;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
@@ -16,6 +22,7 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author rbx
@@ -35,6 +42,10 @@ public class SkuManageServiceImpl implements SkuManageService {
     private SkuSaleAttrValueMapper skuSaleAttrValueMapper;
     @Autowired
     private BaseAttrInfoMapper baseAttrInfoMapper;
+    @Autowired
+    private RedisTemplate redisTemplate;
+    @Autowired
+    private RedissonClient redissonClient;
 
     /**
      * 保存SKU信息
@@ -73,6 +84,9 @@ public class SkuManageServiceImpl implements SkuManageService {
                 skuSaleAttrValueMapper.insert(skuSaleAttrValue);
             }
         }
+        //5.将保存的商品SKU_ID存放到布隆过滤器
+       /* RBloomFilter<Long> bloomFilter = redissonClient.getBloomFilter(RedisConst.SKU_BLOOM_FILTER);
+        bloomFilter.add(skuInfo.getId());*/
     }
 
     //商品管理 -> sku分页列表
@@ -110,7 +124,40 @@ public class SkuManageServiceImpl implements SkuManageService {
     }
 
     //根据skuId获取SkuInfo
+
+
+    /*public SkuInfo getSkuInfo(Long skuId) {
+        String dataKey = RedisConst.SKUKEY_PREFIX + skuId + RedisConst.SKUKEY_SUFFIX;
+        SkuInfo skuInfo = (SkuInfo) redisTemplate.opsForValue().get(dataKey);
+        if (skuInfo == null) {
+            String lockKey = RedisConst.SKUKEY_PREFIX + skuId + RedisConst.SKULOCK_SUFFIX;
+            RLock lock = redissonClient.getLock(lockKey);
+            try {
+                boolean flag = lock.tryLock(RedisConst.SKULOCK_EXPIRE_PX1, RedisConst.SKULOCK_EXPIRE_PX2, TimeUnit.SECONDS);
+                if (flag) {
+                    skuInfo = this.getSkuInfoFromDB(skuId);
+                    if (skuInfo == null) {
+                        redisTemplate.opsForValue().set(dataKey,skuInfo,RedisConst.SKUKEY_TIMEOUT,TimeUnit.MILLISECONDS);
+                        return skuInfo;
+                    }else {
+                        redisTemplate.opsForValue().set(dataKey,skuInfo,RedisConst.SKUKEY_TIMEOUT,TimeUnit.SECONDS);
+                    }
+                }else {
+                    return this.getSkuInfo(skuId);
+                }
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }finally {
+                lock.unlock();
+            }
+        }else {
+            return skuInfo;
+        }
+        return this.getSkuInfoFromDB(skuId);
+    }*/
+
     @Override
+    @GmallCache(prefix = "SkuInfo:")
     public SkuInfo getSkuInfo(Long skuId) {
         SkuInfo skuInfo = skuInfoMapper.selectById(skuId);
         if (skuInfo != null) {
@@ -138,12 +185,14 @@ public class SkuManageServiceImpl implements SkuManageService {
 
     //根据skuId 获取平台属性数据
     @Override
+    @GmallCache(prefix = "attrList:")
     public List<BaseAttrInfo> getAttrList(Long skuId) {
         return baseAttrInfoMapper.getAttrList(skuId);
     }
 
     //根据spuId 获取到销售属性值Id 与skuId 组成的数据集
     @Override
+    @GmallCache(prefix = "SkuValueIdsMap:")
     public Map getSkuValueIdsMap(Long spuId) {
         Map<Object, Object> map = new HashMap<>();
         // key = 125|123 ,value = 37

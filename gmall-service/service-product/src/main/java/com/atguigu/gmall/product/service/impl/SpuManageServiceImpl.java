@@ -1,6 +1,7 @@
 package com.atguigu.gmall.product.service.impl;
 
 import com.atguigu.gmall.base.model.BaseEntity;
+import com.atguigu.gmall.common.cache.GmallCache;
 import com.atguigu.gmall.product.mapper.*;
 import com.atguigu.gmall.product.model.*;
 import com.atguigu.gmall.product.service.SpuManageService;
@@ -126,6 +127,7 @@ public class SpuManageServiceImpl extends ServiceImpl<SpuInfoMapper, SpuInfo> im
 
     //根据spuId 获取海报数据
     @Override
+    @GmallCache(prefix = "spuPosterBySpuId:")
     public List<SpuPoster> findSpuPosterBySpuId(Long spuId) {
         LambdaQueryWrapper<SpuPoster> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SpuPoster::getSpuId,spuId);
@@ -135,6 +137,7 @@ public class SpuManageServiceImpl extends ServiceImpl<SpuInfoMapper, SpuInfo> im
 
     //根据spuId,skuId 获取销售属性数据
     @Override
+    @GmallCache(prefix = "SpuSaleAttrListCheckBySku:")
     public List<SpuSaleAttr> getSpuSaleAttrListCheckBySku(Long skuId, Long spuId) {
         return spuSaleAttrMapper.getSpuSaleAttrListCheckBySku(skuId,spuId);
     }

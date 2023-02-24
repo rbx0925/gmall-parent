@@ -1,5 +1,7 @@
 package com.atguigu.gmall.product.client.impl;
 
+import com.alibaba.fastjson.JSONObject;
+import com.atguigu.gmall.common.result.Result;
 import com.atguigu.gmall.product.client.ProductFeignClient;
 import com.atguigu.gmall.product.model.*;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +53,16 @@ public class ProductDegradeFeignClient implements ProductFeignClient {
 
     @Override
     public Map getSkuValueIdsMap(Long spuId) {
+        return null;
+    }
+
+    @Override
+    public List<JSONObject> getBaseCategoryList() {
+        return null;
+    }
+
+    @Override
+    public BaseTrademark getTrademarkById(Long tmId) {
         return null;
     }
 }
