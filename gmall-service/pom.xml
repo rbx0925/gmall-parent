@@ -12,6 +12,7 @@
     <artifactId>gmall-service</artifactId>
     <modules>
         <module>service-product</module>
+        <module>service-item</module>
     </modules>
 
     <properties>

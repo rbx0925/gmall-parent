@@ -96,4 +96,46 @@ public class SpuManageServiceImpl extends ServiceImpl<SpuInfoMapper, SpuInfo> im
             }
         }
     }
+
+    //根据spuId 查询销售属性
+    @Override
+    public List<SpuSaleAttr> spuSaleAttrList(Long spuId) {
+        LambdaQueryWrapper<SpuSaleAttr> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(SpuSaleAttr::getSpuId,spuId);
+        wrapper.eq(BaseEntity::getIsDeleted,"0");
+        List<SpuSaleAttr> list = spuSaleAttrMapper.selectList(wrapper);
+        for (SpuSaleAttr spuSaleAttr : list) {
+            LambdaQueryWrapper<SpuSaleAttrValue> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(SpuSaleAttrValue::getSpuId,spuId);
+            queryWrapper.eq(SpuSaleAttrValue::getBaseSaleAttrId,spuSaleAttr.getBaseSaleAttrId());
+            queryWrapper.eq(BaseEntity::getIsDeleted,"0");
+            List<SpuSaleAttrValue> valueList = spuSaleAttrValueMapper.selectList(queryWrapper);
+            spuSaleAttr.setSpuSaleAttrValueList(valueList);
+        }
+        return list;
+    }
+
+    //根据spuId 获取spuImage集合
+    @Override
+    public List<SpuImage> spuImageList(Long spuId) {
+        LambdaQueryWrapper<SpuImage> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(SpuImage::getSpuId,spuId);
+        wrapper.eq(BaseEntity::getIsDeleted,"0");
+        return spuImageMapper.selectList(wrapper);
+    }
+
+    //根据spuId 获取海报数据
+    @Override
+    public List<SpuPoster> findSpuPosterBySpuId(Long spuId) {
+        LambdaQueryWrapper<SpuPoster> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(SpuPoster::getSpuId,spuId);
+        wrapper.eq(BaseEntity::getIsDeleted,"0");
+        return spuPosterMapper.selectList(wrapper);
+    }
+
+    //根据spuId,skuId 获取销售属性数据
+    @Override
+    public List<SpuSaleAttr> getSpuSaleAttrListCheckBySku(Long skuId, Long spuId) {
+        return spuSaleAttrMapper.getSpuSaleAttrListCheckBySku(skuId,spuId);
+    }
 }

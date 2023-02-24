@@ -1,7 +1,6 @@
 package com.atguigu.gmall.product.service;
 
-import com.atguigu.gmall.product.model.BaseSaleAttr;
-import com.atguigu.gmall.product.model.SpuInfo;
+import com.atguigu.gmall.product.model.*;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 
@@ -23,4 +22,16 @@ public interface SpuManageService extends IService<SpuInfo> {
 
     //保存spu
     void saveSpuInfo(SpuInfo spuInfo);
+
+    //根据spuId 查询销售属性
+    List<SpuSaleAttr> spuSaleAttrList(Long spuId);
+
+    //根据spuId 获取spuImage 集合
+    List<SpuImage> spuImageList(Long spuId);
+
+    //根据spuId 获取海报数据
+    List<SpuPoster> findSpuPosterBySpuId(Long spuId);
+
+    //根据spuId,skuId 获取销售属性数据
+    List<SpuSaleAttr> getSpuSaleAttrListCheckBySku(Long skuId, Long spuId);
 }

@@ -1,5 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.atguigu.gmall.product.mapper.SpuSaleAttrMapper">
+    <resultMap id="spuSaleAttrMap" type="com.atguigu.gmall.product.model.SpuSaleAttr" autoMapping="true">
+        <id property="id" column="id"/>
+        <collection property="spuSaleAttrValueList" ofType="com.atguigu.gmall.product.model.SpuSaleAttrValue" autoMapping="true">
+            <id property="id" column="spu_sale_attr_value_id"/>
+        </collection>
+    </resultMap>
 
+<!--    //根据spuId,skuId 获取销售属性数据-->
+    <select id="getSpuSaleAttrListCheckBySku" resultMap="spuSaleAttrMap">
+        select
+            ssa.id,
+            ssa.spu_id,
+            ssa.base_sale_attr_id,
+            ssa.sale_attr_name,
+            ssav.id spu_sale_attr_value_id, #销售属性值的ID
+            ssav.sale_attr_value_name,
+            #sv.sku_id,
+            if(sv.sku_id is null,0,1)  is_checked #是否应该选中当前销售属性
+        from spu_sale_attr ssa  inner join spu_sale_attr_value  ssav
+                                        on ssav.spu_id = ssa.spu_id and ssav.base_sale_attr_id = ssa.base_sale_attr_id
+                                left join sku_sale_attr_value sv
+                                        on sv.sale_attr_value_id = ssav.id and sv.is_deleted=0 and sv.sku_id=#{skuId}
+        where ssa.spu_id = #{spuId} and ssa.is_deleted = 0 and ssav.is_deleted = 0
+        order by ssa.base_sale_attr_id,ssav.id
+    </select>
 </mapper>

@@ -34,8 +34,7 @@ public class BaseCategoryView implements Serializable {
 	@TableField("category1_name")
 	private String category1Name;
 
-	@ApiModelProperty(value
- = "二级分类编号")
+	@ApiModelProperty(value = "二级分类编号")
 	@TableField("category2_id")
 	private Long category2Id;
 	@ApiModelProperty(value = "二级分类名称")

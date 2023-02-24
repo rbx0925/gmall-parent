@@ -2,7 +2,9 @@ package com.atguigu.gmall.product.controller;
 
 import com.atguigu.gmall.common.result.Result;
 import com.atguigu.gmall.product.model.BaseSaleAttr;
+import com.atguigu.gmall.product.model.SpuImage;
 import com.atguigu.gmall.product.model.SpuInfo;
+import com.atguigu.gmall.product.model.SpuSaleAttr;
 import com.atguigu.gmall.product.service.SpuManageService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -43,5 +45,19 @@ public class SpuManageController {
     public Result saveSpuInfo(@RequestBody SpuInfo spuInfo){
         spuManageService.saveSpuInfo(spuInfo);
         return Result.ok();
+    }
+
+    //根据spuId 查询销售属性
+    @GetMapping("/spuSaleAttrList/{spuId}")
+    public Result spuSaleAttrList(@PathVariable("spuId") Long spuId){
+        List<SpuSaleAttr> list = spuManageService.spuSaleAttrList(spuId);
+        return Result.ok(list);
+    }
+
+    //根据spuId 获取spuImage 集合
+    @GetMapping("/spuImageList/{spuId}")
+    public Result spuImageList(@PathVariable("spuId") Long spuId){
+        List<SpuImage> list = spuManageService.spuImageList(spuId);
+        return Result.ok(list);
     }
 }
