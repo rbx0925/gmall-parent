@@ -1,10 +1,7 @@
 package com.atguigu.gmall.list.service.impl;
 
 import com.alibaba.fastjson.JSON;
-import com.atguigu.gmall.list.model.Goods;
-import com.atguigu.gmall.list.model.SearchAttr;
-import com.atguigu.gmall.list.model.SearchParam;
-import com.atguigu.gmall.list.model.SearchResponseVo;
+import com.atguigu.gmall.list.model.*;
 import com.atguigu.gmall.list.service.SearchService;
 import com.atguigu.gmall.product.client.ProductFeignClient;
 import com.atguigu.gmall.product.model.BaseAttrInfo;
@@ -31,8 +28,13 @@ import org.elasticsearch.index.query.NestedQueryBuilder;
 import org.elasticsearch.index.query.Operator;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.aggregations.Aggregation;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.aggregations.bucket.nested.NestedAggregationBuilder;
+import org.elasticsearch.search.aggregations.bucket.nested.ParsedNested;
+import org.elasticsearch.search.aggregations.bucket.terms.ParsedLongTerms;
+import org.elasticsearch.search.aggregations.bucket.terms.ParsedStringTerms;
+import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.elasticsearch.search.aggregations.bucket.terms.TermsAggregationBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
@@ -46,6 +48,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -272,7 +275,7 @@ public class SearchServiceImpl implements SearchService {
             }
         }
         //设置过滤字段
-        sourceBuilder.fetchSource(new String[]{"id","title","price","deafultImg"},null);
+        sourceBuilder.fetchSource(new String[]{"id","title","price","defaultImg"},null);
         TermsAggregationBuilder tmIdAgg = AggregationBuilders.terms("tmIdAgg").field("tmId");
         tmIdAgg.subAggregation(AggregationBuilders.terms("tmNameAgg").field("tmName"));
         tmIdAgg.subAggregation(AggregationBuilders.terms("tmLgoUrlAgg").field("tmLogoUrl"));
@@ -287,29 +290,112 @@ public class SearchServiceImpl implements SearchService {
         return searchRequest.source(sourceBuilder);
     }
 
-    //解析ES响应结果:业务数据结果;聚合结果
+
+    /**
+     * 解析ES响应结果:业务数据结果;聚合结果
+     *
+     * @param response
+     * @param searchParam
+     * @return
+     */
     private SearchResponseVo parseResult(SearchResponse response, SearchParam searchParam) {
+        //1.创建搜索响应VO对象
         SearchResponseVo vo = new SearchResponseVo();
+
+        //2.封装分页信息
         vo.setPageNo(searchParam.getPageNo());
         Integer pageSize = searchParam.getPageSize();
         vo.setPageSize(pageSize);
+        //2.1 获取总记录数
         long total = response.getHits().getTotalHits().value;
         vo.setTotal(total);
-        long totalPage = total % pageSize == 0 ? total / pageSize : total / pageSize + 1;
+        //2.2 计算总页数 总数%页大小能整除=总数/页大小  反之+1
+        Long totalPage = total % pageSize == 0 ? total / pageSize : total / pageSize + 1;
         vo.setTotalPages(totalPage);
+
+        //3.封装检索到商品数据-注意处理高亮字段
         SearchHit[] hits = response.getHits().getHits();
-        ArrayList<Goods> goodsList = new ArrayList<>();
-        if (hits!=null&&hits.length>0){
-            for (SearchHit hit :hits){
+        List<Goods> goodsList = new ArrayList<>();
+        if (hits != null && hits.length > 0) {
+            for (SearchHit hit : hits) {
+                //3.1 将得到商品JSON字符串转为Java对象
                 Goods goods = JSON.parseObject(hit.getSourceAsString(), Goods.class);
-                Text[] titles = hit.getHighlightFields().get("title").getFragments();
-                if (titles!=null&&titles.length>0){
-                    goods.setTitle(titles[0].toString());
+                //3.2 处理高亮
+                if(!CollectionUtils.isEmpty(hit.getHighlightFields())){
+                    Text[] titles = hit.getHighlightFields().get("title").getFragments();
+                    if (titles != null && titles.length > 0) {
+                        goods.setTitle(titles[0].toString());
+                    }
                 }
                 goodsList.add(goods);
             }
         }
         vo.setGoodsList(goodsList);
+
+        //4.封装品牌聚合结果
+        Map<String, Aggregation> allAggregationMap = response.getAggregations().asMap();
+        //4.1 获取品牌ID聚合对象 通过获取品牌ID桶得到聚合品牌ID
+        ParsedLongTerms tmIdAgg = (ParsedLongTerms) allAggregationMap.get("tmIdAgg");
+        if (tmIdAgg != null) {
+            List<SearchResponseTmVo> tmVoList = tmIdAgg.getBuckets().stream().map(bucket -> {
+                SearchResponseTmVo tmVo = new SearchResponseTmVo();
+                long tmId = ((Terms.Bucket) bucket).getKeyAsNumber().longValue();
+                tmVo.setTmId(tmId);
+                //4.2 从品牌Id桶内获取品牌名称聚合对象,遍历品牌名称桶得到桶中品牌名称-只有一个
+                ParsedStringTerms tmNameAgg = ((Terms.Bucket) bucket).getAggregations().get("tmNameAgg");
+                if (tmNameAgg != null) {
+                    String tmName = tmNameAgg.getBuckets().get(0).getKeyAsString();
+                    tmVo.setTmName(tmName);
+                }
+                //4.3 从品牌Id桶内获取品牌图片聚合对象,遍历品牌图片桶得到桶中图片Logo-只有一个
+                ParsedStringTerms tmLgoUrlAgg = ((Terms.Bucket) bucket).getAggregations().get("tmLgoUrlAgg");
+                if (tmLgoUrlAgg != null) {
+                    String tmLogoUrl = tmLgoUrlAgg.getBuckets().get(0).getKeyAsString();
+                    tmVo.setTmLogoUrl(tmLogoUrl);
+                }
+                return tmVo;
+            }).collect(Collectors.toList());
+
+            //为响应对象封装聚合品牌列表
+            vo.setTrademarkList(tmVoList);
+        }
+
+        //5.封装平台属性聚合结果
+
+        //5.1 获取平台属性聚合对象
+        ParsedNested attrsAgg = (ParsedNested) allAggregationMap.get("attrsAgg");
+        //5.2 通过平台数据聚合对象获取平台属性ID的聚合对象,获取平台属性ID聚合桶集合
+        if (attrsAgg != null) {
+            ParsedLongTerms attrIdAgg = attrsAgg.getAggregations().get("attrIdAgg");
+            if (attrIdAgg != null) {
+                //5.3 遍历ID桶集合 获取平台属性ID 以及平台属性名称跟属性值
+                List<SearchResponseAttrVo> attrVoList = attrIdAgg.getBuckets().stream().map(bucket -> {
+                    SearchResponseAttrVo attrVo = new SearchResponseAttrVo();
+                    //获取平台属性Id
+                    long atrrId = ((Terms.Bucket) bucket).getKeyAsNumber().longValue();
+                    attrVo.setAttrId(atrrId);
+                    //5.3.1 基于平台属性ID聚合对象 获取平台属性名称子聚合对象.获取平台名称桶内平台属性名称 只有一个
+                    ParsedStringTerms attrNameAgg = ((Terms.Bucket) bucket).getAggregations().get("attrNameAgg");
+                    if (attrNameAgg != null) {
+                        String attrName = attrNameAgg.getBuckets().get(0).getKeyAsString();
+                        attrVo.setAttrName(attrName);
+                    }
+                    //5.3.2 基于平台属性ID聚合对象 获取平台属性值子聚合对象.获取平台属性值桶内平台属性值名称
+                    ParsedStringTerms attrValueAgg = ((Terms.Bucket) bucket).getAggregations().get("attrValueAgg");
+                    if (attrValueAgg != null) {
+                        //遍历平台属性值桶,得到桶内每个平台属性值
+                        List<String> attrValueList = attrValueAgg.getBuckets().stream().map(attrValueBucket -> {
+                            return ((Terms.Bucket) attrValueBucket).getKeyAsString();
+                        }).collect(Collectors.toList());
+
+                        attrVo.setAttrValueList(attrValueList);
+                    }
+                    return attrVo;
+                }).collect(Collectors.toList());
+                //给响应VO对象赋值:平台属性集合
+                vo.setAttrsList(attrVoList);
+            }
+        }
         return vo;
     }
 }
